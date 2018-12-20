@@ -8,42 +8,44 @@ import subprocess
 
 def on_message(ws, message): 
     global timerOnOff, queue, random
-    event = json.loads(message)
+    event = json.loads(message) # decode received message
     try: 
-        if "event" in event: 
+        if "event" in event: # event thrown by mopidy
             if event['event'] == 'playback_state_changed':
                 timerOnOff.cancel() 
                 timerOnOff = Timer(0.5, stoppedPlaying)
                 if event['new_state'] == 'playing': 
-                    startedPlaying()
-                elif event['new_state'] == 'stopped':
-                    timerOnOff.start()  
+                    # if mopidy starts playing, immediately do things
+                    startedPlaying() 
+                elif event['new_state'] == 'stopped': 
+                    # if mopidy stops playing, wait half a second to be sure it remains stopped before doing things
+                    timerOnOff.start() 
             elif event['event'] == 'options_changed': 
-                queue[sendCommand("core.tracklist.get_random", {})] = "random"
+                queue[sendCommand("core.tracklist.get_random", {})] = "random" # ask for random state
             else: 
                 #print event
                 pass
-        elif "id" in event: 
+        elif "id" in event:  # response after request
             if event["id"] in queue: 
-                if (queue[event["id"]] == "random"):  
+                if (queue[event["id"]] == "random"): # if I asked for random state
                     random = event["result"]
                     checkLEDs()
-                queue.pop(event["id"], None)
+                queue.pop(event["id"], None) 
     except:
         log(event) 
         print("An exception occurred: %s" % event) 
 
-def stoppedPlaying():
-    setPlaying(False)
+def stoppedPlaying(): # is called by timerOnOff when mopidy stopped for 0.5s
+    setPlaying(False) 
 
-def startedPlaying():
+def startedPlaying(): # is called when mopidy says it's playing 
     setPlaying(True)
 
 def setPlaying(value):
     global playing
-    if (playing != value): 
+    if (playing != value): # check if state is changed since last 'setPlaying' call
         playing = value 
-        checkLEDs()
+        checkLEDs() 
         if (playing): 
             log ("started playing")
             relais.on()
@@ -53,10 +55,10 @@ def setPlaying(value):
 
 def startPlaylist(playlist): 
     log ("load playlist %s" % playlist)
-    shells(["mpc stop", "mpc clear", "mpc load %s" % playlist, "mpc play"])
+    shells(["mpc stop", "mpc clear", "mpc load %s" % playlist, "mpc play"])  # do commands, one after another
 
 def stopPlayer(): 
-    shell("mpc stop")
+    shell("mpc stop") 
 
 def volume_a_rising():
     if volume_b.is_pressed: 
@@ -86,28 +88,28 @@ def checkLEDs():
         ledBottom.off()
         ledTop.off()
 
-def changePlaylist(): 
+def changePlaylist(): # is called on hardware-button-press
     global timerPlaylist
     timerPlaylist.cancel() 
-    timerPlaylist = Timer(0.5, checkPlaylist)
+    timerPlaylist = Timer(0.5, checkPlaylist) # I use a timer to ensure stable state (my antique hardware buttons have a strange behaviour)
     timerPlaylist.start() 
 
-def checkPlaylist():
-    if channel1.is_pressed: # knop 1
+def checkPlaylist(): # is called by timerPlaylist after 0.5s  
+    if channel1.is_pressed: # button 1 is pressed: playlist 1
         startPlaylist("Benedikt") 
-    elif channel3.is_pressed: # knop 3
+    elif channel3.is_pressed: # button 3 is pressed: playlist 3
         startPlaylist("Tijn")
-    elif channel4.is_pressed: # knop 4
+    elif channel4.is_pressed: # button 4 is pressed: playlist 4
         startPlaylist("sfeer")
-    elif channel5.is_pressed: # knop 5
+    elif channel5.is_pressed: # button 5 is pressed: playlist 5
         startPlaylist("radio")
-    elif channel0.is_pressed: # knop 2
+    elif channel0.is_pressed: # button 0 is active: playlist 2 (button 2 could not be wired, but connection 0 is active as long as another button is pressed)
         startPlaylist("Janne")
-    else:
+    else: # no button is pressed
         stopPlayer()
 
 
-def sendCommand(method, params): 
+def sendCommand(method, params):  # send websocket message
     global msgId 
     msgId += 1
     data = {
@@ -147,16 +149,16 @@ def setCrossfade():
         #shell("mpc crossfade 0") 
         pass
 
-def shell(command): 
+def shell(command): # run 1 command, don't wait
     proc = subprocess.Popen(command, shell=True)
     
-def shells(commands): 
+def shells(commands): # run array of commands, wait for result
     for c in commands: 
         proc = subprocess.Popen(c, shell=True)
         if proc.wait() != 0:
             print("There was an error")
      
-def on_open(ws):
+def on_open(ws): # on init 
     log ("websocket open")
     setRandom()
     setRepeat()
@@ -168,7 +170,7 @@ def log(line):
     shell("echo %s >> /root/siera/siera.log" % fullLine)
     print("%s" % fullLine)
 
-def ping(): 
+def ping(): # just to check logs to see if it stays active
     global timerPing
     log("ping")
     timerPing.cancel()
@@ -190,11 +192,11 @@ if __name__ == "__main__":
     channel4 = Button(2, pull_up=True) # GPIO 2
     channel5 = Button(3, pull_up=True) # GPIO 3
     
-    top1 = Button(23, pull_up=True) # GPIO
-    top2 = Button(22, pull_up=True) # GPIO
-    top3 = Button(27, pull_up=True) # GPIO
-    top4 = Button(17, pull_up=True) # GPIO
-    top5 = Button(24, pull_up=True) # GPIO
+    top1 = Button(23, pull_up=True) # GPIO 23
+    top2 = Button(22, pull_up=True) # GPIO 22
+    top3 = Button(27, pull_up=True) # GPIO 27
+    top4 = Button(17, pull_up=True) # GPIO 17 
+    top5 = Button(24, pull_up=True) # GPIO 24   
 
     ledTop = LED(10) #GPIO 10
     ledBottom = LED(21) #GPIO 21
