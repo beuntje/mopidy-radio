@@ -3,6 +3,7 @@ Python script for controlling my Pi MusicBox and connected hardware
 
 ## Python dependencies: 
 - websocket-client : https://github.com/websocket-client/websocket-client
+- gpiozero
 
 ## hardware: 
 - GPIO 14 - GND: button (switch channel)
