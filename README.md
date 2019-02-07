@@ -21,8 +21,9 @@ Python script for controlling my Pi MusicBox and connected hardware
 - GPIO 6 - GND - GPIO 12: Rotary encoder (volume down/up)
 - GPIO 11 - GND - GPIO 8: Rotary encoder (previous / next)
 
-- GPIO 10 - GND: LED (power)
-- GPIO 21 - GND: LED ()
+- GPIO 10, GPIO 5, GPIO 9 - Resistor - GND: RGB LED 
+- GPIO 25, GPIO 7, GPIO 18 - Resistor - GND: RGB LED 
+- GPIO 20, GPIO 21, GPIO 26 - Resistor - GND: RGB LED 
 
 - 5V - GND - GPIO 13: relais (to power external amplifier/speaker)
 
