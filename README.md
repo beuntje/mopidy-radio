@@ -5,7 +5,6 @@ Python script for controlling KODI on my raspberry pi with connected hardware
 
 ## Dependencies:
 - kodi
-- python pip
 - websocket-client
 - kodi-json
 
@@ -21,8 +20,9 @@ pip install websocket-client
 
 ```bash
 sudo nano /etc/fstab
-
+```
 add: 
+```bash
 //nas/music  /mnt/music/  cifs  user=music,password=xxxxxx,vers=1.0,_netdev,x-systemd.automount  0  0
 //nas/raspberypi/siera /home/pi/siera/  cifs  user=pi,password=xxxxxx,vers=1.0,_netdev,x-systemd.automount  0  0
  
@@ -32,6 +32,8 @@ add:
 ## Autostart: 
 ```bash
 sudo crontab -e
-
-add: @reboot python /home/pi/siera/main.py no_socket >>/home/pi/siera.log 2>&1 
+```
+add: 
+```bash
+@reboot python /home/pi/siera/main.py no_socket >>/home/pi/siera.log 2>&1 
 ```

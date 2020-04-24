@@ -2,18 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7a166de7-f68d-4075-84cd-186805ff33a1" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/colors.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/event.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/kodi.ini" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/kodi.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/log.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/playlist.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/siera.ini" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/front.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/front.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/siera.py" beforeDir="false" afterPath="$PROJECT_DIR$/siera.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +40,7 @@
       <option name="presentableId" value="Default" />
       <updated>1587705770108</updated>
       <workItem from="1587705771847" duration="558000" />
-      <workItem from="1587707206558" duration="17000" />
+      <workItem from="1587707206558" duration="361000" />
     </task>
     <servers />
   </component>
