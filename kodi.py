@@ -242,27 +242,23 @@ class Kodi(object):
   def play_pause(self, value = "toggle"):   
     self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": value}) 
 
-  #def start_playlist(self, playlistnr): 
-  #  playlist = self.presets[playlistnr % len(self.presets)]
-  #  self.__log.add("playlist {} wordt gestart ({})".format(playlistnr, playlist))
-  #  self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id}) 
-  #  self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item":{"file": playlist}}) 
-  #  self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  })  
-
-
-  def start_playlist(self, songs): 
-    def playlist_ready(value): 
+  def start_playlist(self, songs):
+    def playlist_ready(value):
       self.__playlist_load_in_progress = False
 
     self.__playlist_load_in_progress = True
     self.__log.add("playlist wordt gestart")
 
-    self.__ignore_methods.append("Playlist.OnClear") 
-    self.__ignore_methods.append("Playlist.OnAdd")  
-
-    self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id}) 
-    self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item":songs}) 
-    self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  }, playlist_ready)  
+    self.__ignore_methods.append("Playlist.OnClear")
+    self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id})
+    nr = 0
+    for song in songs:
+      self.__ignore_methods.append("Playlist.OnAdd")
+      self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item": {"songid": song["id"]}})
+      if nr == 0:
+        self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  })
+      nr += 1
+    self.__socket_queue("JSONRPC.Ping", {}, playlist_ready)
 
   def on_play_stop(self, callback): 
     self.__event.register("kodi.music", callback)

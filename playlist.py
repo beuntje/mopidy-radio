@@ -25,20 +25,15 @@ class Playlist(object):
  
   def load(self, nr): 
     self.__id = nr
-    playlist = []
     filename = self.__filename(nr)
     if os.path.exists(filename):
       with open(filename, 'r') as file:
-        saved = json.loads(file.read()) 
+        saved = json.loads(file.read())
+        return saved
 
-      for song in saved: 
-        playlist.append({"songid": song["id"]})
-
-    else: 
+    else:
       self.__log.add("playlist {} does not exist".format(nr), "playlist")
-      playlist.append({"songid": 1})
-
-    return playlist
+      return []
 
 
   def new(self): 
