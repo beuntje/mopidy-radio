@@ -1,391 +1,322 @@
-import websocket
-import json
-from threading import Timer, Thread
-from gpiozero import Button, LED, OutputDevice
-import datetime
-import time
-import subprocess
+import configparser
 import os
+import math
+import RPi.GPIO as GPIO
+from event import Event 
+from threading import Timer 
+from log import Log 
 
-def on_message(ws, message): 
-    global timerOnOff, queue, random
-    event = json.loads(message)
-    try: 
-        if "event" in event: 
-            if event['event'] == 'playback_state_changed':
-                timerOnOff.cancel() 
-                timerOnOff = Timer(0.5, stoppedPlaying)
-                if event['new_state'] == 'playing': 
-                    startedPlaying()
-                elif event['new_state'] == 'stopped':
-                    timerOnOff.start()  
-            elif event['event'] == 'options_changed': 
-                queue[sendCommand("core.tracklist.get_random", {})] = "random"
-            else: 
-                #print event
-                pass
-        elif "id" in event: 
-            if event["id"] in queue: 
-                if (queue[event["id"]] == "random"):  
-                    random = event["result"]
-                queue.pop(event["id"], None)
-    except:
-        log("An exception occurred: %s" % event)  
 
-def stoppedPlaying(): # websocket meldt dat audio al sinds halve seconde gestopt is 
-    setPlaying(False)
+class Siera(object):  
+  __timers = {}
+  __log = Log()
+  __active = False 
+  __current_preset = False
 
-def startedPlaying(): # websocket meldt dat autdio gestart is
-    setPlaying(True)
+  def __init__(self):
+    self.__event = Event()
 
-def setPlaying(value): 
-    global playing
-    if (playing != value): 
-        playing = value 
-        if (playing): 
-            log ("started playing") 
-            ledBottom(True, True, False) # geel
-            powerBoxen(True)
+    config = configparser.ConfigParser() 
+    config.read(os.path.join(os.path.dirname(__file__), 'siera.ini'))
+
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+
+    self.__buttons_preset_configure([
+      int(config['Preset']['a']),
+      int(config['Preset']['b']),
+      int(config['Preset']['c']),
+      int(config['Preset']['d']),
+      int(config['Preset']['e'])
+    ])
+    self.__current_preset = self.selected_preset()
+
+    self.__buttons_options_configure([
+      int(config['TopButton']['a']),
+      int(config['TopButton']['b']),
+      int(config['TopButton']['c']),
+      int(config['TopButton']['d']),
+      int(config['TopButton']['e'])
+    ])
+
+    self.__rotary_volume_configure([
+      int(config['Volume']['up']),
+      int(config['Volume']['down'])
+    ])
+
+    self.__rotary_channel_configure([
+      int(config['Channel']['up']),
+      int(config['Channel']['down'])
+    ])
+
+    self.__power_led_configure([
+      int(config['TopLED']['red']),
+      int(config['TopLED']['green']),
+      int(config['TopLED']['blue'])
+    ])
+
+    self.__background_led_configure([ 
+      int(config['LeftLED']['red']),
+      int(config['LeftLED']['green']),
+      int(config['LeftLED']['blue']),
+      int(config['RightLED']['red']),
+      int(config['RightLED']['green']),
+      int(config['RightLED']['blue'])
+    ])
+    
+    self.__relais_configure(int(config['Output']['relais'])) 
+  
+    self.__active = True
+
+    def reset_reset(): 
+      self.__reset_counter = 0
+      del self.__timers["check_reset"]
+
+    def check_reset(btn, value):  
+      if btn == 2: 
+        self.__reset_counter += 1
+        self.__log.add("reset counter: {}".format(self.__reset_counter), "siera")
+        if self.__reset_counter > 5: 
+          self.__event.execute("siera.reset")
+
+        if not "check_reset" in self.__timers: 
+          self.__timers["check_reset"] = Timer(5, reset_reset) 
+          self.__timers["check_reset"].start() 
+
+    self.on_option_change(check_reset) 
+    self.__reset_counter = 0
+    
+    
+  # ---------- Rotary encoder volume ---------- 
+
+  def __rotary_volume_configure(self, pins): 
+    self.__rotary_volume = []
+    self.__rotary_volume_change = 0
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__rotary_volume_turn)
+      self.__rotary_volume.append(pin) 
+
+  def __rotary_volume_turn(self, pin): 
+    def rotary_volume_turn_send(): 
+      value =  self.__rotary_volume_change / 3
+      if (value == 0 and self.__rotary_volume_change != 0): 
+        if self.__rotary_volume_change>0: 
+          value = 1
         else: 
-            log ("stopped playing") 
-            ledBottom(False, False, False) # uit
-            powerBoxen(False)
-
-def startPlaylist(playlist): # het effectief starten van de playlist 
-    global activePreset
-    if activePreset != playlist: 
-        activePreset = playlist
-        shell("mpc consume off")
-        shells(["mpc stop", "mpc clear", "mpc load %s" % playlist, "mpc play"])
-        log ("load playlist %s" % playlist)
-    else: 
-        shell("mpc play")
-        log ("continue play playlist %s" % playlist)
-
-def stopPlayer(): 
-    shell("mpc stop")
-
-def volume_a_rising():
-    if volume_b.is_pressed: 
-        volumeTurn(2)
-        #shell("mpc volume +2")
-
-def volume_b_rising():
-    if volume_a.is_pressed:  
-        #shell("mpc volume -2")
-        volumeTurn(-2)
-
-def zender_a_rising(): 
-    if zender_b.is_pressed:
-        #shell("mpc next")
-        zenderTurn(1)
-
-def zender_b_rising():
-    if zender_a.is_pressed:
-        #shell("mpc prev")
-        zenderTurn(-1)
-
-def zenderTurn(value): 
-    global nextPrev, timerZender
-    if (not nextPrev): # net gestart met draaien of net doChangeZender gehandled
-        timerZender.cancel() 
-        timerZender = Timer(0.5, doChangeZender) 
-        timerZender.start()
-        nextPrev = 0
-    nextPrev = nextPrev + value
-
-def doChangeZender(): 
-    global nextPrev 
-    if (nextPrev > 0): 
-        shell("mpc next")
-    elif (nextPrev < 0): 
-        shell("mpc prev")
-    nextPrev = None
-
+          value = -1 
+      if self.__active: self.__event.execute("siera.volumeturn", value )
+      self.__rotary_volume_change = 0
+      del self.__timers["rotary_volume"]
     
-def volumeTurn(value): 
-    global volumeChangeValue, timerVolume
-    if (not volumeChangeValue): # net gestart met draaien of net doChangeVolume gehandled
-        timerVolume.cancel() 
-        timerVolume = Timer(0.3, doChangeVolume) 
-        timerVolume.start()
-        volumeChangeValue = 0
-    volumeChangeValue = volumeChangeValue + value
-
-def doChangeVolume(): 
-    global volumeChangeValue, volume 
-    volume = volume + volumeChangeValue
-    if (volume > 100): 
-        volume = 100
-    if (volume < 0): 
-        volume = 0
-    shell("amixer set PCM -- %s%%" % volume)
-    volumeChangeValue = None
-
-    # if (volumeChangeValue > 0):  
-    #    # shell("mpc volume +%s" % volumeChangeValue)
-    #    #shell("amixer set PCM -- $[$(amixer get PCM|grep -o [0-9]*%%|sed 's/%%//')+%s]%%" % volumeChangeValue)
-    #    #shell("amixer set PCM -- $[$(amixer get PCM|grep -o [0-9]*%%|sed 's/%%//')+%s]%%" % volumeChangeValue)
-    #    shell("amixer set PCM -- %s%%" % volume)
+    if (GPIO.input(self.__rotary_volume[0]) != GPIO.input(self.__rotary_volume[1])): 
+      if self.__rotary_volume[0]==pin: 
+        self.__rotary_volume_change += 1
+      else: 
+        self.__rotary_volume_change -= 1
         
-    #elif (volumeChangeValue < 0): 
-    #    # shell("mpc volume %s" % volumeChangeValue)
-    #    #shell("amixer set PCM -- $[$(amixer get PCM|grep -o [0-9]*%%|sed 's/%%//')%s]%%" % volumeChangeValue)
-    #    shell("amixer set PCM -- %s%%" % volume)
-
-
-def changePlaylist(): 
-    global timerPlaylist
-    timerPlaylist.cancel() 
-    timerPlaylist = Timer(0.5, checkPlaylist)
-    timerPlaylist.start() 
-
-def checkPlaylist():
-    global presets
-    preset = 0
-    if top4.is_pressed: 
-        preset = 5
-    if top5.is_pressed: 
-        preset = 10
-
-    if channel1.is_pressed: # knop 1
-        log ("knop 1 pressed")
-        startPlaylist(presets[preset+0]) 
-    elif channel3.is_pressed: # knop 3
-        log ("knop 3 pressed")
-        startPlaylist(presets[preset+2])
-    elif channel4.is_pressed: # knop 4
-        log ("knop 4 pressed")
-        startPlaylist(presets[preset+3])
-    elif channel5.is_pressed: # knop 5
-        log ("knop 5 pressed")
-        startPlaylist(presets[preset+4])
-    elif channel0.is_pressed: # knop 2
-        log ("knop 2 pressed")
-        startPlaylist(presets[preset+1])
-    else:
-        log ("stop-knop pressed")
-        stopPlayer()
-
-
-def sendCommand(method, params): 
-    global msgId 
-    msgId += 1
-    data = {
-        'jsonrpc': '2.0',
-        'id': msgId,
-        'method': method,
-        'params': params
-    }
-    ws.send(json.dumps(data)) 
-    return msgId 
+    if not "rotary_volume" in self.__timers: 
+      self.__timers["rotary_volume"] = Timer(0.2, rotary_volume_turn_send) 
+      self.__timers["rotary_volume"].start() 
  
-def setRepeatAndRandom(): 
-    if top1.is_pressed: # 1e knop ingedrukt
-        shell("mpc single off") 
-        shell("mpc repeat off") 
-        shell("mpc random on")
-    elif not top2.is_pressed: #2e knop ingedrukt
-        shell("mpc single off") 
-        shell("mpc repeat on") 
-        shell("mpc random on")
-    else:  # geen knoppen ingedrukt
-        shell("mpc single off") 
-        shell("mpc repeat off") 
-        shell("mpc random off")
 
-def shell(command): 
-    log ("shell %s" % command) 
-    proc = subprocess.Popen(command, shell=True)
+  def on_volume_turn(self, callback): 
+    self.__event.register("siera.volumeturn", callback) 
+
+  # ---------- Rotary encoder channel ---------- 
+
+  def __rotary_channel_configure(self, pins): 
+    self.__rotary_channel = []
+    self.__rotary_channel_change = 0
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__rotary_channel_turn)
+      self.__rotary_channel.append(pin) 
+
+  def __rotary_channel_turn(self, pin): 
+    def rotary_channel_turn_send(): 
+      value = (1 if self.__rotary_channel_change>0 else -1)
+      if self.__active: self.__event.execute("siera.channelturn", value ) 
+      self.__rotary_channel_change = 0
+      del self.__timers["rotary_channel"]
     
-def shells(commands): 
-    for c in commands: 
-        log ("shell %s" % c) 
-        proc = subprocess.Popen(c, shell=True)
-        if proc.wait() != 0:
-            log("There was an error (in shell)")
-     
-def on_open(ws):
-    global activePreset
-    log ("websocket open")
-    setRepeatAndRandom()
-    checkMount()
-    ledTop(False, True, False) # groen
-    ledBottom(False, False, False) # uit
-    activePreset = None # reset presets 
-    volumeTurn(0)
+    if (GPIO.input(self.__rotary_channel[0]) == GPIO.input(self.__rotary_channel[1])): 
+      #if self.__rotary_channel[0]==pin: 
+      #  self.__rotary_channel_change -= 1
+      #else: 
+      #  self.__rotary_channel_change += 1
+      pass
+    else:  
+      if self.__rotary_channel[0]==pin: 
+        self.__rotary_channel_change += 1
+      else: 
+        self.__rotary_channel_change -= 1
+        
+    if not "rotary_channel" in self.__timers: 
+      self.__timers["rotary_channel"] = Timer(0.9, rotary_channel_turn_send) 
+      self.__timers["rotary_channel"].start() 
+ 
 
-def checkMount(): 
-    if (not os.path.isdir("/music/Network/A")): 
-        shell("sh /root/mount.sh") 
+  def on_channel_turn(self, callback): 
+    self.__event.register("siera.channelturn", callback) 
 
+  # ---------- Preset buttons ---------- 
 
-def log(line): 
-    global logFile
-    now = datetime.datetime.now()
-    path = "/root/logs/recent.log"
+  def __buttons_preset_configure(self, pins): 
+    self.__buttons_presets = []
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__button_preset_pressed)
+      self.__buttons_presets.append(pin) 
 
-    if (not logFile): 
-        if (now.year > 1970): 
-            logFile = ("/root/logs/%d-%d-%d.log" % (now.year, now.month, now.day))
-            proc = subprocess.Popen(("mv %s %s" % (path, logFile)), shell=True)
-            if proc.wait() != 0:
-                pass 
-            path = logFile 
-    else: 
-        path = logFile 
+  def __button_preset_pressed(self, pin):  
+    def wait_until_stable(): 
+      preset = self.selected_preset()
 
-    fullLine = "%d/%d %d:%d.%d - %s" % (now.day, now.month, now.hour, now.minute, now.second, line)
-    proc = subprocess.Popen("echo \"%s\" >> %s" % (fullLine, path), shell=True) # geen shell, want anders infinite loop
-    print(fullLine)
+      if self.__current_preset == preset: 
+        return 
 
-def powerBoxen(on): 
-    if (on): 
-        relais.on()
-    else: 
-        relais.off()
-
-def ping(): 
-    global timerPing
-    log("ping")
-    timerPing.cancel()
-    timerPing = Timer(6 * 60 * 60, ping) # 6 uur
-    timerPing.start()
-
-def ledTop(red, green, blue): 
-    if (red):
-        ledTopRed.on()
-    else: 
-        ledTopRed.off()
-    if (green):
-        ledTopGreen.on()
-    else: 
-        ledTopGreen.off()
-    if (blue):
-        ledTopBlue.on()
-    else: 
-        ledTopBlue.off()
-
-
-def ledBottom(red, green, blue): 
-    if (red):
-        ledBottomLeftRed.on()
-        ledBottomRightRed.on()
-    else: 
-        ledBottomLeftRed.off()
-        ledBottomRightRed.off()
-    if (green):
-        ledBottomLeftGreen.on()
-        ledBottomRightGreen.on()
-    else: 
-        ledBottomLeftGreen.off()
-        ledBottomRightGreen.off()
-    if (blue):
-        ledBottomLeftBlue.on()
-        ledBottomRightBlue.on()
-    else: 
-        ledBottomLeftBlue.off()
-        ledBottomRightBlue.off()
-
-
-if __name__ == "__main__":
-    logFile = None
-    log ("started script")
+      self.__current_preset = preset
+      self.__log.add("preset {} pressed".format(preset), "siera")
+      if (preset > 0):
+        if self.__active: self.__event.execute("siera.presetbutton", preset)
+      else: 
+        if self.__active: self.__event.execute("siera.stop")
+      if "preset_change" in self.__timers: del self.__timers["preset_change"]
     
-    volume_a = Button(6, pull_up=True) # Rotary encoder pin A connected to GPIO 6
-    volume_b = Button(12, pull_up=True) # Rotary encoder pin B connected to GPIO 12
-    zender_a = Button(11, pull_up=True) # Rotary encoder pin A connected to GPIO 11
-    zender_b = Button(8, pull_up=True) # Rotary encoder pin B connected to GPIO 8
+    if "preset_change" in self.__timers: 
+      self.__timers["preset_change"].cancel() 
+    self.__timers["preset_change"] = Timer(0.5, wait_until_stable) 
+    self.__timers["preset_change"].start() 
 
-    channel0 = Button(14, pull_up=True) # GPIO 14
-    channel1 = Button(15, pull_up=True) # GPIO 15
-    channel3 = Button(4, pull_up=True) # GPIO 4
-    channel4 = Button(2, pull_up=True) # GPIO 2
-    channel5 = Button(3, pull_up=True) # GPIO 3
-    
-    top1 = Button(22, pull_up=True) # GPIO
-    top2 = Button(24, pull_up=True) # GPIO
-    top3 = Button(23, pull_up=True) # GPIO
-    top4 = Button(27, pull_up=True) # GPIO
-    top5 = Button(17, pull_up=True) # GPIO
+  def on_stop(self, callback): 
+    self.__event.register("siera.stop", callback) 
+
+  def on_preset_change(self, callback): 
+    self.__event.register("siera.presetbutton", callback) 
+ 
+ 
+  def selected_preset(self): 
+    if not GPIO.input(self.__buttons_presets[1]): 
+        preset = 1 
+    elif not GPIO.input(self.__buttons_presets[2]): 
+        preset = 3
+    elif not GPIO.input(self.__buttons_presets[3]):  
+        preset = 4
+    elif not GPIO.input(self.__buttons_presets[4]): 
+        preset = 5
+    elif not GPIO.input(self.__buttons_presets[0]): 
+        preset = 2
+    else:
+        preset = 0
+    return preset
+
+
+  def preset_is_selected(self, nr): 
+    return self.selected_preset() == nr
+
+  # ---------- Option buttons ---------- 
+
+  def __buttons_options_configure(self, pins): 
+    self.__buttons_options = []
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__button_options_pressed)
+      self.__buttons_options.append(pin) 
+
+  def __button_options_pressed(self, event_pin): 
+    def wait_until_stable(): 
+      nr = 0
+      for option_pin in self.__buttons_options: 
+        if event_pin == option_pin and self.__active: self.__event.execute("siera.optionbutton", nr, self.option_is_down(nr))
+        nr += 1 
+
+    if "option_change_{}".format(event_pin) in self.__timers: 
+      self.__timers["option_change_{}".format(event_pin)].cancel() 
+    self.__timers["option_change_{}".format(event_pin)] = Timer(0.25, wait_until_stable) 
+    self.__timers["option_change_{}".format(event_pin)].start() 
     
 
-    ledTopRed = LED(25) #GPIO 25
-    ledTopGreen = LED(7) #GPIO 7
-    ledTopBlue = LED(18) #GPIO 18
+  def on_option_change(self, callback): 
+    self.__event.register("siera.optionbutton", callback)
 
-    ledBottomRightRed = LED(20) #GPIO 20
-    ledBottomRightGreen = LED(21) #GPIO 21
-    ledBottomRightBlue = LED(26) #GPIO 26
+  def option_is_down(self, nr): 
+    if nr in [1]: 
+      return GPIO.input(self.__buttons_options[nr])
+    else: 
+      return not GPIO.input(self.__buttons_options[nr])
 
-    ledBottomLeftRed = LED(9) #GPIO 10
-    ledBottomLeftGreen = LED(5) #GPIO 9
-    ledBottomLeftBlue = LED(10) #GPIO 5
 
-    relais = OutputDevice(13, active_high=False, initial_value=False) #GPIO 13
+  # ---------- Relais ---------- 
 
-    volume_a.when_pressed = volume_a_rising 
-    volume_b.when_pressed = volume_b_rising 
-    zender_a.when_pressed = zender_a_rising 
-    zender_b.when_pressed = zender_b_rising 
+  def __relais_configure(self, pin): 
+    GPIO.setup(pin, GPIO.OUT)
+    self.__relais = pin
 
-    channel0.when_held = changePlaylist 
-    channel0.when_released = changePlaylist 
-    channel1.when_held = changePlaylist
-    channel1.when_released = changePlaylist
-    channel3.when_held = changePlaylist
-    channel3.when_released = changePlaylist
-    channel4.when_held = changePlaylist
-    channel4.when_released = changePlaylist
-    channel5.when_held = changePlaylist
-    channel5.when_released = changePlaylist
-    
-    top1.when_pressed = setRepeatAndRandom 
-    top1.when_released = setRepeatAndRandom 
-    top2.when_pressed = setRepeatAndRandom
-    top2.when_released = setRepeatAndRandom
-    #top3.when_pressed = topButtons
-    #top3.when_released = topButtons
-    #top4.when_pressed = topButtons # enkel van belang voor playlists
-    #top4.when_released = topButtons # enkel van belang voor playlists
-    #top5.when_pressed = topButtons # enkel van belang voor playlists
-    #top5.when_released = topButtons # enkel van belang voor playlists
+ 
+  def relais(self, power): 
+    GPIO.output(self.__relais, power) 
 
-    playing = None
-    random = None 
-    nextPrev = None 
-    volumeChangeValue = None
-    volume = 20
+  # ---------- Top LED (power) ---------- 
 
-    ledTop(False, False, True) # blauw
+  def __power_led_configure(self, pins): 
+    self.__power_led = [] 
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.OUT)
+      led = GPIO.PWM(pin, 100) # PWM Frequency: 100
+      led.start(0) 
+      self.__power_led.append(led) 
 
-    activePreset = None
-    presets = ["Benedikt", "Janne", "Tijn", "sfeer", "List5", 
-            "StuBru", "StuBruTijdloze", "Radio2", "Radio1", "Nostalgie", 
-            "List11", "List12", "List13", "List14", "List15"]
 
-    queue = {}
-    msgId = 0; 
-    timerOnOff = Timer(0.5, stoppedPlaying)
-    timerZender = Timer(0.5, doChangeZender)
-    timerVolume = Timer(0.5, doChangeVolume)
-    timerPlaylist = Timer(0.5, changePlaylist)
-    timerPing = Timer(1, ping)
-    timerPing.start()
+  def power_led(self, color_values): 
+    i=0
+    for led in self.__power_led:
+      led.ChangeDutyCycle(color_values[i])
+      i += 1
 
-    while (True): 
-        websocket.enableTrace(True)
-        ws = websocket.WebSocketApp("ws://localhost:6680/mopidy/ws/", on_message = on_message, on_open = on_open) 
+  def power_led_rainbow(self, sec = 5): 
+    def power_led_rainbow_interval(): 
+      frequency = .3
+      remaining_calls = calls - 1  
 
-        wst = Thread(target=ws.run_forever)
-        wst.daemon = True
-        wst.start()
+      self.__power_led[0].ChangeDutyCycle(math.sin(frequency*remaining_calls + 0) * 50 + 50)
+      self.__power_led[1].ChangeDutyCycle(math.sin(frequency*remaining_calls + 2) * 50 + 50)
+      self.__power_led[2].ChangeDutyCycle(math.sin(frequency*remaining_calls + 4) * 50 + 50)
+  
+      if (remaining_calls > 0): 
+        self.power_led_rainbow(remaining_calls) 
+      else: 
+        del self.__timers["power_led_rainbow"]
+ 
+    speed = 0.03  
+    calls = sec
+    if not "power_led_rainbow" in self.__timers:  
+      calls = sec / speed 
+    self.__timers["power_led_rainbow"] = Timer(speed, power_led_rainbow_interval) 
+    self.__timers["power_led_rainbow"].start() 
 
-        while (wst.isAlive()): 
-            time.sleep(0.5)
+  # ---------- Bottom LEDs (background) ---------- 
 
-        ledTop(True, False, False) # rood
-        log ("websocket failed") 
+  def __background_led_configure(self, pins): 
+    self.__background_led = []
+    for pin in pins: 
+      GPIO.setup(pin, GPIO.OUT)
+      led =  GPIO.PWM(pin, 100) # PWM Frequency: 100
+      led.start(0) 
+      self.__background_led.append(led)
 
-        time.sleep(10) # bij websocket fail wordt om de 10 seconden opnieuw geprobeerd
+  def background_led(self, color_values): 
+    i=0
+    for led in self.__background_led:  
+      led.ChangeDutyCycle(color_values[i])
+      i += 1
 
+  # ---------- Emergency button ---------- 
+
+  def on_reset(self, callback): 
+    self.__event.register("siera.reset", callback)
+
+  # ---------- Default ---------- 
+
+  def cleanup(self): 
+    GPIO.cleanup()

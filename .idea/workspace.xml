@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="7a166de7-f68d-4075-84cd-186805ff33a1" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/colors.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/event.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/kodi.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/kodi.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/log.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/playlist.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/siera.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/front.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/front.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/siera.py" beforeDir="false" afterPath="$PROJECT_DIR$/siera.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1ayRIvhXiIa7HgsLfQuNFWNKlLI" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$USER_HOME$/web" />
+    <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
+    <property name="nodejs_npm_path_reset_for_default_project" value="true" />
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="7a166de7-f68d-4075-84cd-186805ff33a1" name="Default Changelist" comment="" />
+      <created>1587705770108</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1587705770108</updated>
+      <workItem from="1587705771847" duration="558000" />
+      <workItem from="1587707206558" duration="17000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="2" />
+  </component>
+</project>
