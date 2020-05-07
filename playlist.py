@@ -24,14 +24,14 @@ class Playlist(object):
       print "NO SAVE"
  
   def load(self, nr): 
-    self.__id = nr
+    self.__id = nr 
     filename = self.__filename(nr)
     if os.path.exists(filename):
       with open(filename, 'r') as file:
-        saved = json.loads(file.read())
+        saved = json.loads(file.read()) 
         return saved
-
-    else:
+ 
+    else: 
       self.__log.add("playlist {} does not exist".format(nr), "playlist")
       return []
 
@@ -40,6 +40,8 @@ class Playlist(object):
     self.__id = False
     pass
 
+  def custom(self): 
+    return not self.__id
 
   def __filename(self, nr): 
       return "{}/playlist_{}.txt".format(self.__path, nr)

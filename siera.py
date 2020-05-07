@@ -63,28 +63,32 @@ class Siera(object):
       int(config['RightLED']['green']),
       int(config['RightLED']['blue'])
     ])
-    
+     
     self.__relais_configure(int(config['Output']['relais'])) 
   
     self.__active = True
 
     def reset_reset(): 
-      self.__reset_counter = 0
+      self.__reset_counters = {}
       del self.__timers["check_reset"]
 
     def check_reset(btn, value):  
-      if btn == 2: 
-        self.__reset_counter += 1
-        self.__log.add("reset counter: {}".format(self.__reset_counter), "siera")
-        if self.__reset_counter > 5: 
-          self.__event.execute("siera.reset")
+      if not btn in self.__reset_counters: 
+        self.__reset_counters[btn] = 0
+      else:
+        self.__reset_counters[btn] += 1
 
-        if not "check_reset" in self.__timers: 
-          self.__timers["check_reset"] = Timer(5, reset_reset) 
-          self.__timers["check_reset"].start() 
+      if self.__reset_counters[btn] > 1: 
+        self.__log.add("reset counter {}: {}".format(btn, self.__reset_counters[btn]), "siera")
+      if self.__reset_counters[btn] == 5: 
+        self.__event.execute("siera.reset.{}".format(btn))
+
+      if not "check_reset" in self.__timers: 
+        self.__timers["check_reset"] = Timer(5, reset_reset) 
+        self.__timers["check_reset"].start() 
 
     self.on_option_change(check_reset) 
-    self.__reset_counter = 0
+    self.__reset_counters = {}
     
     
   # ---------- Rotary encoder volume ---------- 
@@ -98,14 +102,16 @@ class Siera(object):
       self.__rotary_volume.append(pin) 
 
   def __rotary_volume_turn(self, pin): 
-    def rotary_volume_turn_send(): 
-      value =  self.__rotary_volume_change / 3
+    def rotary_volume_turn_send():  
+      value =  self.__rotary_volume_change / 5 
       if (value == 0 and self.__rotary_volume_change != 0): 
         if self.__rotary_volume_change>0: 
           value = 1
         else: 
           value = -1 
-      if self.__active: self.__event.execute("siera.volumeturn", value )
+      if self.__active: 
+        self.__event.execute("siera.volumeturn", value )
+        self.__log.add("volume turn:  {}".format(value), "siera")    
       self.__rotary_volume_change = 0
       del self.__timers["rotary_volume"]
     
@@ -113,7 +119,7 @@ class Siera(object):
       if self.__rotary_volume[0]==pin: 
         self.__rotary_volume_change += 1
       else: 
-        self.__rotary_volume_change -= 1
+        self.__rotary_volume_change -= 1 
         
     if not "rotary_volume" in self.__timers: 
       self.__timers["rotary_volume"] = Timer(0.2, rotary_volume_turn_send) 
@@ -136,7 +142,9 @@ class Siera(object):
   def __rotary_channel_turn(self, pin): 
     def rotary_channel_turn_send(): 
       value = (1 if self.__rotary_channel_change>0 else -1)
-      if self.__active: self.__event.execute("siera.channelturn", value ) 
+      if self.__active: 
+        self.__event.execute("siera.channelturn", value ) 
+        self.__log.add("channel turn:  {}".format(value), "siera")    
       self.__rotary_channel_change = 0
       del self.__timers["rotary_channel"]
     
@@ -313,8 +321,8 @@ class Siera(object):
 
   # ---------- Emergency button ---------- 
 
-  def on_reset(self, callback): 
-    self.__event.register("siera.reset", callback)
+  def on_option_5clicks(self, nr, callback): 
+    self.__event.register("siera.reset.{}".format(nr), callback)
 
   # ---------- Default ---------- 
 
