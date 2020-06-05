@@ -9,24 +9,36 @@ def option_changed(button, value):
     if (button == 2): MUSIC.shuffled = value
     if (button == 3): MUSIC.repeat = "all" if value else "off"
     if (button == 4): MUSIC.partymode = value
-    
 
-def preset_changed(preset): 
+def get_preset(): 
+    preset = RADIO.selected_preset()
+    if preset == 0:
+        return 0
     if RADIO.option_is_down(0): 
         pass
     elif RADIO.option_is_down(1): 
         preset += 5
     else: 
         preset += 10
+    return preset 
+    
 
-    MUSIC.start_playlist(PLAYLIST.load(preset)) 
+def preset_changed(preset): 
+    preset = get_preset()
+
+    if (PLAYLIST.current == preset): 
+        MUSIC.play()
+    else: 
+        MUSIC.start_playlist(PLAYLIST.load(preset)) 
+    
+def stop_music():
+	MUSIC.pauze() 
 
 def playlist_update(playlist):  
     if not MUSIC.partymode: 
-        PLAYLIST.save(playlist)
-
-def playlist_clear(): 
-    PLAYLIST.new()    
+        if get_preset() == PLAYLIST.current: 
+            PLAYLIST.save(playlist) 
+ 
 
 def volume_turn(value): 
     MUSIC.volume += value 
@@ -34,10 +46,10 @@ def volume_turn(value):
 
 def channel_turn(value): 
     if value > 0: 
-        #MUSIC.next()
+        MUSIC.next()
         pass
     else: 
-        #MUSIC.previous()
+        MUSIC.previous()
         pass
 
 def radio_on_off(is_on): 
@@ -79,7 +91,7 @@ RADIO.on_preset_change(preset_changed)
 RADIO.on_option_change(option_changed)
 RADIO.on_volume_turn(volume_turn) 
 RADIO.on_channel_turn(channel_turn)
-RADIO.on_stop(MUSIC.stop)
+RADIO.on_stop(stop_music)
 RADIO.on_option_5clicks(2, kill_program)
 RADIO.on_option_5clicks(3, kill_all)
   
@@ -87,8 +99,7 @@ MUSIC.on_play_stop(radio_on_off)
 connection_active(MUSIC.is_active)
 
 MUSIC.on_connection_change(connection_active)
-MUSIC.on_playlist_update(playlist_update)
-MUSIC.on_playlist_clear(playlist_clear)
+MUSIC.on_playlist_update(playlist_update) 
 
 PROGRAM_ACTIVE = True
 try:

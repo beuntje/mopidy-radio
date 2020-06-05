@@ -70,7 +70,7 @@ class Siera(object):
 
     def reset_reset(): 
       self.__reset_counters = {}
-      del self.__timers["check_reset"]
+      if "check_reset" in self.__timers: del self.__timers["check_reset"] 
 
     def check_reset(btn, value):  
       if not btn in self.__reset_counters: 

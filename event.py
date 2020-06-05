@@ -10,7 +10,7 @@ class Event:
     self.callbacks[eventkey].append( func )
 
   def execute(self, eventkey, *args): 
-    self.__log.add("event '{}' fired".format(eventkey), "event")
+    self.__log.add("event '{}' fired ({})".format(eventkey, args), "event")
 
     if eventkey in self.callbacks: 
         for func in self.callbacks[eventkey]: 

@@ -34,6 +34,10 @@ class Playlist(object):
     else: 
       self.__log.add("playlist {} does not exist".format(nr), "playlist")
       return []
+ 
+  @property
+  def current(self): 
+    return self.__id    
 
 
   def new(self): 

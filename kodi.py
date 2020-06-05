@@ -24,26 +24,39 @@ class Kodi(object):
   __socket_queue_busy = False
   __timers = {}
   __playlist_load_in_progress = False
-  __ignore_methods = []; 
+  __ignore_methods = [] 
+  __active_playlist = []
 
   def __init__(self):
     self.__log.add("init kodi", "kodi")
     config = configparser.ConfigParser()  
     config.read(os.path.join(os.path.dirname(__file__), 'kodi.ini'))
     self.__event = Event()
-    self.__start_socket(config['Kodi']['host'], int(config['Kodi']['websocket']))
     self.presets = json.loads( config['Music']['presets'] )
+    self.__socket_msg_id = 0
+    self.__queue = {}
+    self.__start_socket(config['Kodi']['host'], int(config['Kodi']['websocket']))
+ 
 
 
   def __start_socket(self, host, port): 
     self.__log.add("start socket {}:{}".format(host, port), "socket")
     websocket.enableTrace(False)
     self.__socket = websocket.WebSocketApp("ws://{}:{}".format(host, port), on_message = self.__socket_message, on_open = self.__socket_open, on_error = self.__socket_error, on_close = self.__socket_close) 
-    self.__socket_msg_id = 0
-    self.__queue = {}
     thread = Thread(target=self.__socket.run_forever)
     thread.daemon = True
     thread.start()
+
+  def __socket_error(self, msg): 
+    pass
+
+  def __socket_close(self): 
+    def retry(): 
+      self.__init__() 
+      if "retry_socket" in self.__timers: del self.__timers["retry_socket"] 
+
+    self.__set_active(False)
+    self.__timers["retry_socket"] = Timer(5, retry)     
 
 
   def __socket_message(self, msg): 
@@ -79,21 +92,23 @@ class Kodi(object):
           
         elif event["method"] in ["Player.OnStop", "Player.OnPause"]: 
           self.__started_playing(False)
-          
-        elif event["method"] in ["Playlist.OnAdd", "Playlist.OnRemove"]:  
-          if not self.__playlist_load_in_progress: self.__playlist_updated()
- 
+
+        elif event["method"] in ["Playlist.OnAdd"]:  
+          self.__playlist_add(event["params"]["data"])
+
+        elif event["method"] in ["Playlist.OnRemove"]:  
+          self.__playlist_remove(event["params"]["data"]["position"])
+  
         elif event["method"] in ["Playlist.OnClear"]:  
-          if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_clear")
+          self.__playlist_clear()
+          
+          
  
  
     except ValueError: 
       self.__log.add("error on msg", "socket")
       pass
 
-
-  def __socket_error(self, msg): 
-    pass
 
 
   def __socket_open(self): 
@@ -118,15 +133,38 @@ class Kodi(object):
 
     self.__socket_send("Player.GetActivePlayers", {}, check_active_player)
     self.__socket_send("Application.GetProperties", {'properties': ["volume", "muted"]}, set_application_properties)
- 
+    self.__playlist_get()
+
+
+  ####### PLAYLIST 
+
+  def __playlist_add(self, item): 
+    if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_add_item", item)
+    self.__playlist_updated()
+
+  def __playlist_remove(self, position): 
+    item = self.__active_playlist.pop(position)
+    if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_remove_item", item)
+    self.__playlist_updated()
+
+  def __playlist_clear(self): 
+    if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_clear")
+    self.__playlist_updated()
+
+  def __playlist_get(self, callback = False): 
+    def update_playlist(result): 
+      if "items" in result: 
+        self.__active_playlist = result["items"] 
+        if callback: 
+          callback(result["items"]) 
+    self.__socket_send("Playlist.GetItems", {"playlistid": self.__playlist_id}, update_playlist)
  
   def __playlist_updated(self): 
     def send_playlist(result): 
-      if "items" in result: 
-        self.__event.execute("kodi.playlist_updated", result["items"])
+      if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_updated", result)
 
     def wait_until_stable():   
-      self.__socket_send("Playlist.GetItems", {"playlistid": self.__playlist_id}, send_playlist)
+      self.__playlist_get(send_playlist)
       if "playlist_updated" in self.__timers: del self.__timers["playlist_updated"]
  
     if "playlist_updated" in self.__timers: 
@@ -134,8 +172,8 @@ class Kodi(object):
     self.__timers["playlist_updated"] = Timer(0.1, wait_until_stable) 
     self.__timers["playlist_updated"].start()   
 
-  def __socket_close(self): 
-    self.__set_active(False) 
+
+  #######
 
 
   def __set_active(self, value): 
@@ -237,6 +275,9 @@ class Kodi(object):
   def start(self):   
     self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": True}) 
 
+  def play(self):   
+    self.start()
+
   def pauze(self):   
     self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": False}) 
 
@@ -250,11 +291,9 @@ class Kodi(object):
     self.__playlist_load_in_progress = True
     self.__log.add("playlist wordt gestart")
 
-    self.__ignore_methods.append("Playlist.OnClear") 
     self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id}) 
     nr = 0
-    for song in songs: 
-      self.__ignore_methods.append("Playlist.OnAdd")  
+    for song in songs:  
       self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item": {"songid": song["id"]}}) 
       if nr == 0: 
         self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  })  
@@ -269,6 +308,13 @@ class Kodi(object):
 
   def on_playlist_update(self, callback):   
     self.__event.register("kodi.playlist_updated", callback) 
+
+  def on_playlist_add_item(self, callback):   
+    self.__event.register("kodi.playlist_add_item", callback) 
+
+  def on_playlist_remove_item(self, callback):   
+    self.__event.register("kodi.playlist_remove_item", callback) 
+
 
   def on_playlist_clear(self, callback):  
     self.__event.register("kodi.playlist_clear", callback) 
