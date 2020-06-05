@@ -34,6 +34,6 @@ add:
 sudo crontab -e
 ```
 add: 
-```bash
-@reboot python /home/pi/siera/main.py no_socket >>/home/pi/siera.log 2>&1 
+```bash 
+@reboot python /home/pi/siera/main.py no_warning no_info no_socket no_siera no_event >>/home/pi/siera.log
 ```
