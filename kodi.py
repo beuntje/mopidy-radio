@@ -19,7 +19,6 @@ class Kodi(object):
   __player_id = 0
   __playlist_id = 0
   __log = Log()
-  presets = []
   __socket_queued = []
   __socket_queue_busy = False
   __timers = {}
@@ -32,7 +31,6 @@ class Kodi(object):
     config = configparser.ConfigParser()  
     config.read(os.path.join(os.path.dirname(__file__), 'kodi.ini'))
     self.__event = Event()
-    self.presets = json.loads( config['Music']['presets'] )
     self.__socket_msg_id = 0
     self.__queue = {}
     self.__start_socket(config['Kodi']['host'], int(config['Kodi']['websocket']))
