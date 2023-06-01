@@ -13,7 +13,6 @@ class Playlist(object):
     config = Config()
     self.__path = config.value['Music']['location']
 
-
   def save(self, playlist):
     if self.__id:
       print ("DO SAVE AS {}".format(self.__id))

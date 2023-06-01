@@ -66,12 +66,11 @@ class Spotify(object):
         else:
             self.play()
 
-    def start_playlist(self, songs):
-        print (songs)
-
     def start_playlist(self, nr):
         playlist_id = self.__config.value["spotify_playlists"][str(nr)]
         self.__spotipy.start_playback(context_uri=f'spotify:playlist:{playlist_id}', device_id=self.__device_id)
+        self.is_playing = True
+        self.__event.execute("spotify.music", True)
 
     def on_play_stop(self, callback):
         self.__event.register("spotify.music", callback)
