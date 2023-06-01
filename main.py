@@ -1,5 +1,6 @@
 from siera import Siera
 from kodi import Kodi
+from spotify import Spotify
 from log import Log
 from playlist import Playlist
 from config import Config

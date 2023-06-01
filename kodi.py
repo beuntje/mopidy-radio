@@ -1,9 +1,9 @@
-import configparser
 import os
 from event import Event
 from threading import Thread, Timer
 import websocket
 import json
+from config import Config
 from log import Log
 
 # https://kodi.wiki/view/JSON-RPC_API/v8
@@ -29,12 +29,11 @@ class Kodi(object):
 
   def __init__(self):
     self.__log.add("init kodi", "kodi")
-    config = configparser.ConfigParser()
-    config.read(os.path.join(os.path.dirname(__file__), 'kodi.ini'))
+    config = Config()
     self.__event = Event()
     self.__socket_msg_id = 0
     self.__queue = {}
-    self.__start_socket(config['Kodi']['host'], int(config['Kodi']['websocket']))
+    self.__start_socket(config.value['Kodi']['host'], int(config.value['Kodi']['websocket']))
 
 
 
