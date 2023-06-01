@@ -17,9 +17,9 @@ class Spotify(object):
         self.__config = Config()
         self.__log.add("init spotify", "spotify")
         self.__event = Event()
-        #self.__queue = {}
         self.__connect(self.__config.value['spotify']['client_id'], self.__config.value['spotify']['client_secret'], self.__config.value['spotify']['redirect_uri'])
         self.__device_id = self.__config.value['spotify']['device_id'];
+        self.is_playing = self.__is_playing()
 
     def __connect(self, client_id, client_secret, redirect_uri):
         auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
@@ -27,16 +27,40 @@ class Spotify(object):
 
         self.__spotipy = spotipy.Spotify(auth_manager=auth)
 
-
     @property
     def volume(self):
-        return self.__spotipy.current_playback()['device']['volume_percent']
+        return self.__player['device']['volume_percent']
 
     @volume.setter
     def volume(self, value):
+        value = int(value)
         if value < 0: value = 0
         if value > 100: value = 100
         self.__spotipy.volume(value, device_id=self.__device_id)
+
+    @property
+    def __player(self):
+        current_playback = self.__spotipy.current_playback()
+        if current_playback is not None and current_playback['is_playing']:
+            if current_playback['device']['id'] == self.__device_id:
+                return current_playback
+        return false
+
+    @property
+    def shuffled(self):
+        current_playback = self.__player
+        return current_playback and 'shuffle_state' in current_playback and current_playback['shuffle_state']
+
+    @shuffled.setter
+    def shuffled(self, value):
+        self.__spotipy.shuffle(Value, device_id=self.__device_id)
+
+    def __is_playing(self):
+        current_playback = self.__player
+        if current_playback is not None and current_playback['is_playing']:
+            if current_playback['device']['id'] == self.__device_id:
+                return True
+        return False
 
     def next(self):
         self.__spotipy.next_track(device_id=self.__device_id)
