@@ -1,18 +1,19 @@
 import configparser
 import os
-from event import Event 
-from threading import Thread, Timer 
+from event import Event
+from threading import Thread, Timer
 import websocket
 import json
-from log import Log 
+from log import Log
 
 # https://kodi.wiki/view/JSON-RPC_API/v8
 
-class Kodi(object): 
+class Kodi(object):
+  player = "KODI"
   __volume = 30
   is_playing = False
   is_active = True
-  __muted = False 
+  __muted = False
   __partymode = False
   __shuffled = False
   __repeat = "off" # off, one, all
@@ -23,305 +24,305 @@ class Kodi(object):
   __socket_queue_busy = False
   __timers = {}
   __playlist_load_in_progress = False
-  __ignore_methods = [] 
+  __ignore_methods = []
   __active_playlist = []
 
   def __init__(self):
     self.__log.add("init kodi", "kodi")
-    config = configparser.ConfigParser()  
+    config = configparser.ConfigParser()
     config.read(os.path.join(os.path.dirname(__file__), 'kodi.ini'))
     self.__event = Event()
     self.__socket_msg_id = 0
     self.__queue = {}
     self.__start_socket(config['Kodi']['host'], int(config['Kodi']['websocket']))
- 
 
 
-  def __start_socket(self, host, port): 
+
+  def __start_socket(self, host, port):
     self.__log.add("start socket {}:{}".format(host, port), "socket")
     websocket.enableTrace(False)
-    self.__socket = websocket.WebSocketApp("ws://{}:{}".format(host, port), on_message = self.__socket_message, on_open = self.__socket_open, on_error = self.__socket_error, on_close = self.__socket_close) 
+    self.__socket = websocket.WebSocketApp("ws://{}:{}".format(host, port), on_message = self.__socket_message, on_open = self.__socket_open, on_error = self.__socket_error, on_close = self.__socket_close)
     thread = Thread(target=self.__socket.run_forever)
     thread.daemon = True
     thread.start()
 
-  def __socket_error(self, msg): 
+  def __socket_error(self, msg):
     pass
 
-  def __socket_close(self): 
-    def retry(): 
-      self.__init__() 
-      if "retry_socket" in self.__timers: del self.__timers["retry_socket"] 
+  def __socket_close(self):
+    def retry():
+      self.__init__()
+      if "retry_socket" in self.__timers: del self.__timers["retry_socket"]
 
     self.__set_active(False)
-    self.__timers["retry_socket"] = Timer(5, retry)     
+    self.__timers["retry_socket"] = Timer(5, retry)
 
 
-  def __socket_message(self, msg): 
-    try:  
+  def __socket_message(self, msg):
+    try:
       self.__log.add("new message: {}".format( msg ), "socket")
-      event = json.loads(msg) 
-      
-      if "result" in event: 
-        if event["id"] in self.__queue:  
+      event = json.loads(msg)
+
+      if "result" in event:
+        if event["id"] in self.__queue:
           self.__queue[event["id"]](event["result"])
           del self.__queue[event["id"]]
-      elif "error" in event: 
-        if event["id"] in self.__queue:  
+      elif "error" in event:
+        if event["id"] in self.__queue:
           self.__queue[event["id"]](event["error"])
           del self.__queue[event["id"]]
 
-      if "method" in event:  
-        if event["method"] in self.__ignore_methods: 
+      if "method" in event:
+        if event["method"] in self.__ignore_methods:
           self.__ignore_methods.remove(event["method"])
           return
 
-        if event["method"] == "Application.OnVolumeChanged": 
+        if event["method"] == "Application.OnVolumeChanged":
           self.__volume = event["params"]["data"]["volume"]
           self.__muted = event["params"]["data"]["muted"]
 
-        if event["method"] == "Player.OnPropertyChanged": 
+        if event["method"] == "Player.OnPropertyChanged":
           if "partymode" in event["params"]["data"]["property"]: self.__partymode = event["params"]["data"]["property"]["partymode"]
           if "shuffled" in event["params"]["data"]["property"]: self.__shuffled = event["params"]["data"]["property"]["shuffled"]
           if "repeat" in event["params"]["data"]["property"]: self.__repeat = event["params"]["data"]["property"]["repeat"]
- 
-        elif event["method"] in ["Player.OnPlay", "Player.OnResume"]: 
+
+        elif event["method"] in ["Player.OnPlay", "Player.OnResume"]:
           self.__started_playing(True)
-          
-        elif event["method"] in ["Player.OnStop", "Player.OnPause"]: 
+
+        elif event["method"] in ["Player.OnStop", "Player.OnPause"]:
           self.__started_playing(False)
 
-        elif event["method"] in ["Playlist.OnAdd"]:  
+        elif event["method"] in ["Playlist.OnAdd"]:
           self.__playlist_add(event["params"]["data"])
 
-        elif event["method"] in ["Playlist.OnRemove"]:  
+        elif event["method"] in ["Playlist.OnRemove"]:
           self.__playlist_remove(event["params"]["data"]["position"])
-  
-        elif event["method"] in ["Playlist.OnClear"]:  
+
+        elif event["method"] in ["Playlist.OnClear"]:
           self.__playlist_clear()
-          
-          
- 
- 
-    except ValueError: 
+
+
+
+
+    except ValueError:
       self.__log.add("error on msg", "socket")
       pass
 
 
 
-  def __socket_open(self): 
-    self.__set_active(True) 
+  def __socket_open(self):
+    self.__set_active(True)
 
-    def check_active_player(result): 
-      if len(result) > 0: 
+    def check_active_player(result):
+      if len(result) > 0:
         self.__started_playing(True)
         self.__player_id = result[0]["playerid"]
         self.__socket_send("Player.GetProperties", {'playerid': self.__player_id, 'properties': ["partymode", "shuffled", "repeat"]}, set_player_properties)
-      else: 
+      else:
         self.__started_playing(False)
 
-    def set_application_properties(result):  
+    def set_application_properties(result):
       self.__volume = result["volume"]
-      self.__muted = result["muted"] 
- 
-    def set_player_properties(result):   
-      self.__partymode = result["partymode"] 
-      self.__shuffled = result["shuffled"] 
-      self.__repeat = result["repeat"] 
+      self.__muted = result["muted"]
+
+    def set_player_properties(result):
+      self.__partymode = result["partymode"]
+      self.__shuffled = result["shuffled"]
+      self.__repeat = result["repeat"]
 
     self.__socket_send("Player.GetActivePlayers", {}, check_active_player)
     self.__socket_send("Application.GetProperties", {'properties': ["volume", "muted"]}, set_application_properties)
     self.__playlist_get()
 
 
-  ####### PLAYLIST 
+  ####### PLAYLIST
 
-  def __playlist_add(self, item): 
+  def __playlist_add(self, item):
     if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_add_item", item)
     self.__playlist_updated()
 
-  def __playlist_remove(self, position): 
+  def __playlist_remove(self, position):
     item = self.__active_playlist.pop(position)
     if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_remove_item", item)
     self.__playlist_updated()
 
-  def __playlist_clear(self): 
+  def __playlist_clear(self):
     if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_clear")
     self.__playlist_updated()
 
-  def __playlist_get(self, callback = False): 
-    def update_playlist(result): 
-      if "items" in result: 
-        self.__active_playlist = result["items"] 
-        if callback: 
-          callback(result["items"]) 
+  def __playlist_get(self, callback = False):
+    def update_playlist(result):
+      if "items" in result:
+        self.__active_playlist = result["items"]
+        if callback:
+          callback(result["items"])
     self.__socket_send("Playlist.GetItems", {"playlistid": self.__playlist_id}, update_playlist)
- 
-  def __playlist_updated(self): 
-    def send_playlist(result): 
+
+  def __playlist_updated(self):
+    def send_playlist(result):
       if not self.__playlist_load_in_progress: self.__event.execute("kodi.playlist_updated", result)
 
-    def wait_until_stable():   
+    def wait_until_stable():
       self.__playlist_get(send_playlist)
       if "playlist_updated" in self.__timers: del self.__timers["playlist_updated"]
- 
-    if "playlist_updated" in self.__timers: 
-      self.__timers["playlist_updated"].cancel() 
-    self.__timers["playlist_updated"] = Timer(0.1, wait_until_stable) 
-    self.__timers["playlist_updated"].start()   
+
+    if "playlist_updated" in self.__timers:
+      self.__timers["playlist_updated"].cancel()
+    self.__timers["playlist_updated"] = Timer(0.1, wait_until_stable)
+    self.__timers["playlist_updated"].start()
 
 
   #######
 
 
-  def __set_active(self, value): 
+  def __set_active(self, value):
     self.__event.execute("kodi.connection", value)
     self.is_active = value
-  
 
-  def __socket_queue(self, method, params, callback = False): 
-    def do_next(result): 
+
+  def __socket_queue(self, method, params, callback = False):
+    def do_next(result):
       self.__socket_queue_busy = True
       if len(self.__socket_queued)>0:
         next = self.__socket_queued.pop(0)
         if "execute" in next: next["execute"](result)
         self.__socket_send(next["method"], next["params"], do_next)
-      else:  
-        self.__socket_queue_busy = False 
+      else:
+        self.__socket_queue_busy = False
 
-    self.__socket_queued.append({"method": method, "params": params}) 
-    if callback: 
-      self.__socket_queued.append({"method": "JSONRPC.Ping", "params": {}, "execute": callback}) 
+    self.__socket_queued.append({"method": method, "params": params})
+    if callback:
+      self.__socket_queued.append({"method": "JSONRPC.Ping", "params": {}, "execute": callback})
 
     if not self.__socket_queue_busy: do_next(0)
- 
 
-  def __socket_send(self, method, params, callback = False): 
-    if self.is_active: 
-      self.__socket_msg_id += 1 
+
+  def __socket_send(self, method, params, callback = False):
+    if self.is_active:
+      self.__socket_msg_id += 1
       data = {
           'jsonrpc': '2.0',
           'id': self.__socket_msg_id,
           'method': method,
           'params': params
       }
-      if callback: 
+      if callback:
         self.__queue[self.__socket_msg_id] = callback
 
-      self.__socket.send(json.dumps(data)) 
+      self.__socket.send(json.dumps(data))
       self.__log.add("send msg {}: {}".format(self.__socket_msg_id , json.dumps(data)), "socket")
-      return self.__socket_msg_id 
+      return self.__socket_msg_id
 
   @property
-  def volume(self): 
+  def volume(self):
     return self.__volume
 
   @volume.setter
-  def volume(self, value): 
+  def volume(self, value):
     if value < 0: value = 0
     if value > 100: value = 100
     self.__volume = value
-    self.__ignore_methods.append("Application.OnVolumeChanged") 
+    self.__ignore_methods.append("Application.OnVolumeChanged")
     self.__socket_send("Application.SetVolume", {"volume":int(value)})
- 
+
 
   @property
-  def muted(self): 
+  def muted(self):
     return self.__muted
 
   @muted.setter
-  def muted(self, value): 
+  def muted(self, value):
     self.__socket_send("Application.SetMute", {"mute": value})
- 
+
 
   @property
-  def shuffled(self): 
+  def shuffled(self):
     return self.__shuffled
 
-  @shuffled.setter 
-  def shuffled(self, value): 
+  @shuffled.setter
+  def shuffled(self, value):
     self.__socket_send("Player.SetShuffle", {"playerid": self.__player_id, "shuffle": value})
- 
+
 
   @property
-  def repeat(self): 
+  def repeat(self):
     return self.__repeat
 
   @repeat.setter
   def repeat(self, value):
     self.__socket_send("Player.SetRepeat", {"playerid": self.__player_id, "repeat": value})
- 
+
 
   @property
-  def partymode(self): 
+  def partymode(self):
     return self.__partymode
 
   @partymode.setter
-  def partymode(self, value):  
+  def partymode(self, value):
     self.__socket_send("Player.SetPartymode", {"playerid": self.__player_id, "partymode": value})
- 
 
-  def next(self):  
+
+  def next(self):
     self.__socket_send("Player.GoTo", [self.__player_id, "next"])
 
-  def previous(self):  
+  def previous(self):
     self.__socket_send("Player.GoTo", [self.__player_id, "previous"])
 
-  def stop(self):   
+  def stop(self):
     self.__socket_send("Player.Stop", [self.__player_id])
 
-  def start(self):   
-    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": True}) 
+  def start(self):
+    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": True})
 
-  def play(self):   
+  def play(self):
     self.start()
 
-  def pauze(self):   
-    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": False}) 
+  def pauze(self):
+    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": False})
 
-  def play_pause(self, value = "toggle"):   
-    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": value}) 
+  def play_pause(self, value = "toggle"):
+    self.__socket_send("Player.PlayPause", {"playerid": self.__player_id , "play": value})
 
-  def start_playlist(self, songs): 
-    def playlist_ready(value): 
+  def start_playlist(self, songs):
+    def playlist_ready(value):
       self.__playlist_load_in_progress = False
 
     self.__playlist_load_in_progress = True
     self.__log.add("playlist wordt gestart")
 
-    self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id}) 
+    self.__socket_queue("Playlist.Clear", {"playlistid": self.__playlist_id})
     nr = 0
-    for song in songs:  
-      self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item": {"songid": song["id"]}}) 
-      if nr == 0: 
-        self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  })  
+    for song in songs:
+      self.__socket_queue("Playlist.Add", {"playlistid": self.__playlist_id , "item": {"songid": song["id"]}})
+      if nr == 0:
+        self.__socket_queue("Player.Open", { "item":{"position":0,"playlistid":  self.__playlist_id },"options":{}  })
       nr += 1
-    self.__socket_queue("JSONRPC.Ping", {}, playlist_ready)   
+    self.__socket_queue("JSONRPC.Ping", {}, playlist_ready)
 
-  def on_play_stop(self, callback): 
+  def on_play_stop(self, callback):
     self.__event.register("kodi.music", callback)
 
-  def on_connection_change(self, callback): 
+  def on_connection_change(self, callback):
     self.__event.register("kodi.connection", callback)
 
-  def on_playlist_update(self, callback):   
-    self.__event.register("kodi.playlist_updated", callback) 
+  def on_playlist_update(self, callback):
+    self.__event.register("kodi.playlist_updated", callback)
 
-  def on_playlist_add_item(self, callback):   
-    self.__event.register("kodi.playlist_add_item", callback) 
+  def on_playlist_add_item(self, callback):
+    self.__event.register("kodi.playlist_add_item", callback)
 
-  def on_playlist_remove_item(self, callback):   
-    self.__event.register("kodi.playlist_remove_item", callback) 
+  def on_playlist_remove_item(self, callback):
+    self.__event.register("kodi.playlist_remove_item", callback)
 
 
-  def on_playlist_clear(self, callback):  
-    self.__event.register("kodi.playlist_clear", callback) 
+  def on_playlist_clear(self, callback):
+    self.__event.register("kodi.playlist_clear", callback)
 
-  def __started_playing(self, value): 
-    if value != self.is_playing: 
+  def __started_playing(self, value):
+    if value != self.is_playing:
       self.__log.add("changed playing status to {}".format(value))
       self.is_playing = value
       self.__event.execute("kodi.music", value)
 
-  def cleanup(self): 
-    self.__socket.close() 
+  def cleanup(self):
+    self.__socket.close()

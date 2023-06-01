@@ -1,9 +1,9 @@
 # mopidy-radio
-Python script for controlling KODI on my raspberry pi with connected hardware
+Python script for controlling KODI or Spotify on my raspberry pi with connected hardware
 
 ![](front.jpg)
 
-## Dependencies:
+## Dependencies for Kodi-remote:
 - kodi
 - websocket-client
 - kodi-json
@@ -16,6 +16,13 @@ pip install kodi-json
 pip install websocket-client
 ```
 
+## Dependencies for Spotify-remote:
+- Spotipy
+
+```bash 
+pip install spotipy 
+```
+
 ## Mount synology NAS: 
 
 ```bash
@@ -25,7 +32,6 @@ add:
 ```bash
 //nas/music  /mnt/music/  cifs  user=music,password=xxxxxx,vers=1.0,_netdev,x-systemd.automount  0  0
 //nas/raspberypi/siera /home/pi/siera/  cifs  user=pi,password=xxxxxx,vers=1.0,_netdev,x-systemd.automount  0  0
- 
 ```
 
 
