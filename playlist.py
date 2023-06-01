@@ -2,6 +2,7 @@ import configparser
 import os
 import json
 from log import Log
+from config import Config
 
 class Playlist(object):
   __path = False
@@ -9,9 +10,8 @@ class Playlist(object):
   __log = Log()
 
   def __init__(self):
-    config = configparser.ConfigParser()
-    config.read(os.path.join(os.path.dirname(__file__), 'kodi.ini'))
-    self.__path = config['Music']['location']
+    config = Config()
+    self.__path = config.value['Music']['location']
 
 
   def save(self, playlist):
