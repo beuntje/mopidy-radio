@@ -8,13 +8,7 @@ client_secret = x
 redirect_uri = x
 user_id = x
 device_id = x
-
-[spotify_playlists]
-1 = 5zArXCpFAxMnFlNcvFaJFI
-2 = 5zArXCpFAxMnFlNcvFaJFI
-3 = 5zArXCpFAxMnFlNcvFaJFI
-4 = 5zArXCpFAxMnFlNcvFaJFI
-5 = 5zArXCpFAxMnFlNcvFaJFI
+default_playlist = spotify:album:2PtZABAnPwyVF8KquMWPnG
 
 [Kodi]
 host=localhost

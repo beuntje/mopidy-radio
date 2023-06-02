@@ -15,3 +15,6 @@ print(MUSIC.player)
 print(MUSIC.volume)
 
 # MUSIC.start_playlist(2)
+
+#MUSIC.debug()
+MUSIC.start_playlist(1)

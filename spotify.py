@@ -3,6 +3,8 @@ from config import Config
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from log import Log
+import os
+import json
 
 class Spotify(object):
     player = "SPOTIFY"
@@ -14,15 +16,15 @@ class Spotify(object):
     __device_id = False
 
     def __init__(self):
-        self.__config = Config()
+        self.__config = Config().value['spotify']
         self.__log.add("init spotify", "spotify")
         self.__event = Event()
-        self.__connect(self.__config.value['spotify']['client_id'], self.__config.value['spotify']['client_secret'], self.__config.value['spotify']['redirect_uri'])
-        self.__device_id = self.__config.value['spotify']['device_id'];
+        self.__connect(self.__config['client_id'], self.__config['client_secret'], self.__config['redirect_uri'])
+        self.__device_id = self.__config['device_id'];
         self.is_playing = self.__is_playing()
 
     def __connect(self, client_id, client_secret, redirect_uri):
-        auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
+        auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state", open_browser=False)
         print(auth.get_authorize_url())
 
         self.__spotipy = spotipy.Spotify(auth_manager=auth)
@@ -95,8 +97,13 @@ class Spotify(object):
             self.play()
 
     def start_playlist(self, nr):
-        playlist_id = self.__config.value["spotify_playlists"][str(nr)]
-        self.__spotipy.start_playback(context_uri=f'spotify:playlist:{playlist_id}', device_id=self.__device_id)
+        playlist = self.get_playlist_item(nr)
+        if (not self.is_playing):
+            playlist = self.__current_playlist()
+            if (playlist):
+                print(playlist)
+                self.save_playlist(nr, playlist)
+        self.__spotipy.start_playback(context_uri=playlist, device_id=self.__device_id)
         self.is_playing = True
         self.__event.execute("spotify.music", True)
 
@@ -120,3 +127,40 @@ class Spotify(object):
 
     def cleanup(self):
         pass
+
+    def debug(self):
+        print (self.__current_playlist())
+        return
+        current_playback = self.__spotipy.current_playback()
+        print(current_playback)
+
+    def __current_playlist(self):
+        current_playback = self.__spotipy.current_playback()
+        if current_playback is not None and current_playback['is_playing']:
+            return current_playback['context']['uri']
+        return False
+
+    @property
+    def __playlist_file(self):
+        return "spotify.json"
+
+    def playlist(self):
+        if os.path.exists(self.__playlist_file):
+          with open(self.__playlist_file, 'r') as file:
+            return json.loads(file.read())
+        else:
+            return {}
+
+    def get_playlist_item(self, nr):
+        playlist = self.playlist()
+        nr = str(nr)
+        if (nr in playlist):
+            return playlist[nr]
+        return self.__config['default_playlist']
+
+    def save_playlist(self, nr, new):
+        playlist = self.playlist()
+        playlist[nr] = new
+        with open(self.__playlist_file, 'w') as file:
+            file.write(json.dumps(playlist))
+            self.__log.add("save playlist", "spotify")
