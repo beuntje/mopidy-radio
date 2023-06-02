@@ -9,8 +9,9 @@ print (MUSIC.volume)
 #MUSIC.volume += 5
 print (MUSIC.volume)
 
-MUSIC.play()
+# MUSIC.play()
 
 print(MUSIC.player)
+print(MUSIC.volume)
 
-MUSIC.start_playlist(2)
+# MUSIC.start_playlist(2)

@@ -22,14 +22,21 @@ class Spotify(object):
         self.is_playing = self.__is_playing()
 
     def __connect(self, client_id, client_secret, redirect_uri):
-        auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
-        print(auth.get_authorize_url())
+        self.__spotipy = spotipy.Spotify(auth_manager=SpotifyOAuth(
+            client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, open_browser=False, scope="user-modify-playback-state,user-read-playback-state"))
 
-        self.__spotipy = spotipy.Spotify(auth_manager=auth)
+        #auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
+        #print(auth.get_authorize_url())
+
+        #self.__spotipy = spotipy.Spotify(auth_manager=auth)
 
     @property
     def volume(self):
-        return self.__player['device']['volume_percent']
+        current_playback = self.__player
+        if current_playback:
+            return self.__player['device']['volume_percent']
+        else:
+            return 20
 
     @volume.setter
     def volume(self, value):
@@ -44,7 +51,7 @@ class Spotify(object):
         if current_playback is not None and current_playback['is_playing']:
             if current_playback['device']['id'] == self.__device_id:
                 return current_playback
-        return false
+        return False
 
     @property
     def shuffled(self):
@@ -53,11 +60,11 @@ class Spotify(object):
 
     @shuffled.setter
     def shuffled(self, value):
-        self.__spotipy.shuffle(Value, device_id=self.__device_id)
+        self.__spotipy.shuffle(value, device_id=self.__device_id)
 
     def __is_playing(self):
         current_playback = self.__player
-        if current_playback is not None and current_playback['is_playing']:
+        if current_playback and current_playback['is_playing']:
             if current_playback['device']['id'] == self.__device_id:
                 return True
         return False
