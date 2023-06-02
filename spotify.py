@@ -5,6 +5,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from log import Log
 import os
 import json
+from threading import Timer
 
 class Spotify(object):
     player = "SPOTIFY"
@@ -15,6 +16,8 @@ class Spotify(object):
     __spotipy = False
     __log = Log()
     __device_id = False
+    __volume = False
+    __timers = {}
 
     def __init__(self):
         self.__config = Config().value['spotify']
@@ -32,19 +35,28 @@ class Spotify(object):
 
     @property
     def volume(self):
-        current_playback = self.__player
-        if current_playback:
-            return self.__player['device']['volume_percent']
+        if (self.__volume):
+            return self.__volume
         else:
-            return 20
+            current_playback = self.__player
+            if current_playback:
+                return self.__player['device']['volume_percent']
+            else:
+                return 20
 
     @volume.setter
     def volume(self, value):
+        def reset_volume():
+            self.__volume = False
         value = int(value)
         if value < 0: value = 0
         if value > 100: value = 100
+        self.__volume = value
         self.__log.add("volume set:  {}".format(value), "spotify")
         self.__spotipy.volume(value, device_id=self.__device_id)
+        if "reset_volume" in self.__timers: self.__timers["reset_volume"].cancel()
+        self.__timers['reset_volume'] = Timer(10, reset_volume)
+        self.__timers['reset_volume'].start()
 
     @property
     def __player(self):

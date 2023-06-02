@@ -6,7 +6,15 @@ print(config.value['spotify']['client_id']);
 
 MUSIC = Spotify()
 print (MUSIC.volume)
-#MUSIC.volume += 5
+MUSIC.volume += 1
+MUSIC.volume += 1
+MUSIC.volume += 1
+MUSIC.volume += 1
+
+while True:
+    pass
+
+exit()
 print (MUSIC.volume)
 
 # MUSIC.play()

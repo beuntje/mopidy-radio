@@ -48,7 +48,6 @@ def playlist_update(playlist):
 def volume_turn(value):
     MUSIC.volume += value * 3
 
-
 def channel_turn(value):
     if value > 0:
         MUSIC.next()
