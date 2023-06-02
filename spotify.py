@@ -99,10 +99,10 @@ class Spotify(object):
     def start_playlist(self, nr):
         playlist = self.get_playlist_item(nr)
         if (not self.is_playing):
-            playlist = self.__current_playlist()
-            if (playlist):
-                print(playlist)
-                self.save_playlist(nr, playlist)
+            new = self.__current_playlist()
+            if (new):
+                self.save_playlist(nr, new)
+                playlist = new
         self.__spotipy.start_playback(context_uri=playlist, device_id=self.__device_id)
         self.is_playing = True
         self.__event.execute("spotify.music", True)
