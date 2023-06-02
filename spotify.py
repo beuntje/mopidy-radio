@@ -11,6 +11,7 @@ class Spotify(object):
     is_active = True
     is_playing = False
     __config = False
+    __shuffled = False
     __spotipy = False
     __log = Log()
     __device_id = False
@@ -59,6 +60,7 @@ class Spotify(object):
 
     @shuffled.setter
     def shuffled(self, value):
+        self.__shuffled = value
         self.__spotipy.shuffle(value, device_id=self.__device_id)
 
     def __is_playing(self):
@@ -104,6 +106,9 @@ class Spotify(object):
                 self.save_playlist(nr, new)
                 playlist = new
         self.__spotipy.start_playback(context_uri=playlist, device_id=self.__device_id)
+        if (self.__shuffled):
+            self.shuffled = True
+            self.next()
         self.is_playing = True
         self.__event.execute("spotify.music", True)
 
