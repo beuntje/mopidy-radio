@@ -4,6 +4,7 @@ from event import Event
 from threading import Timer
 from log import Log
 from config import Config
+from encoder import Encoder
 
 
 class Siera(object):
@@ -94,35 +95,11 @@ class Siera(object):
   def __rotary_volume_configure(self, pins):
     self.__rotary_volume = []
     self.__rotary_volume_change = 0
-    for pin in pins:
-      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__rotary_volume_turn)
-      self.__rotary_volume.append(pin)
+    e1 = Encoder(pins[1], pins[0], callback=self.__rotary_volume_turn)
 
-  def __rotary_volume_turn(self, pin):
-    def rotary_volume_turn_send():
-      value =  self.__rotary_volume_change / 5
-      if (value == 0 and self.__rotary_volume_change != 0):
-        if self.__rotary_volume_change>0:
-          value = 1
-        else:
-          value = -1
-      if self.__active:
-        self.__event.execute("siera.volumeturn", value )
-        self.__log.add("volume turn:  {}".format(value), "siera")
-      self.__rotary_volume_change = 0
-      del self.__timers["rotary_volume"]
-
-    if (GPIO.input(self.__rotary_volume[0]) != GPIO.input(self.__rotary_volume[1])):
-      if self.__rotary_volume[0]==pin:
-        self.__rotary_volume_change += 1
-      else:
-        self.__rotary_volume_change -= 1
-
-    if not "rotary_volume" in self.__timers:
-      self.__timers["rotary_volume"] = Timer(0.2, rotary_volume_turn_send)
-      self.__timers["rotary_volume"].start()
-
+  def __rotary_volume_turn(self, value):
+    self.__event.execute("siera.volumeturn", value )
+    self.__log.add("volume turn:  {}".format(value), "siera")
 
   def on_volume_turn(self, callback):
     self.__event.register("siera.volumeturn", callback)
@@ -132,36 +109,11 @@ class Siera(object):
   def __rotary_channel_configure(self, pins):
     self.__rotary_channel = []
     self.__rotary_channel_change = 0
-    for pin in pins:
-      GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-      GPIO.add_event_detect(pin, GPIO.RISING, callback=self.__rotary_channel_turn)
-      self.__rotary_channel.append(pin)
+    e2 = Encoder(pins[1], pins[0], callback=self.__rotary_channel_turn)
 
-  def __rotary_channel_turn(self, pin):
-    def rotary_channel_turn_send():
-      value = (1 if self.__rotary_channel_change>0 else -1)
-      if self.__active:
-        self.__event.execute("siera.channelturn", value )
-        self.__log.add("channel turn:  {}".format(value), "siera")
-      self.__rotary_channel_change = 0
-      del self.__timers["rotary_channel"]
-
-    if (GPIO.input(self.__rotary_channel[0]) == GPIO.input(self.__rotary_channel[1])):
-      #if self.__rotary_channel[0]==pin:
-      #  self.__rotary_channel_change -= 1
-      #else:
-      #  self.__rotary_channel_change += 1
-      pass
-    else:
-      if self.__rotary_channel[0]==pin:
-        self.__rotary_channel_change += 1
-      else:
-        self.__rotary_channel_change -= 1
-
-    if not "rotary_channel" in self.__timers:
-      self.__timers["rotary_channel"] = Timer(0.9, rotary_channel_turn_send)
-      self.__timers["rotary_channel"].start()
-
+  def __rotary_channel_turn(self, value):
+    self.__event.execute("siera.channelturn", value )
+    self.__log.add("channel turn:  {}".format(value), "siera")
 
   def on_channel_turn(self, callback):
     self.__event.register("siera.channelturn", callback)

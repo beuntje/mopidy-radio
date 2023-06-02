@@ -43,6 +43,7 @@ class Spotify(object):
         value = int(value)
         if value < 0: value = 0
         if value > 100: value = 100
+        self.__log.add("channel turn:  {}".format(value), "spotify")
         self.__spotipy.volume(value, device_id=self.__device_id)
 
     @property
