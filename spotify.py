@@ -129,15 +129,18 @@ class Spotify(object):
         pass
 
     def debug(self):
-        print (self.__current_playlist())
-        return
         current_playback = self.__spotipy.current_playback()
         print(current_playback)
 
     def __current_playlist(self):
         current_playback = self.__spotipy.current_playback()
         if current_playback is not None and current_playback['is_playing']:
-            return current_playback['context']['uri']
+            if current_playback['context'] is not None:
+                return current_playback['context']['uri']
+            if current_playback['item'] is not None:
+                return current_playback['item']['artists'][0]['uri']
+                return current_playback['item']['uri']
+
         return False
 
     @property
@@ -160,6 +163,8 @@ class Spotify(object):
 
     def save_playlist(self, nr, new):
         playlist = self.playlist()
+        if (nr in playlist):
+            del playlist[nr]
         playlist[nr] = new
         with open(self.__playlist_file, 'w') as file:
             file.write(json.dumps(playlist))
