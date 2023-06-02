@@ -22,13 +22,10 @@ class Spotify(object):
         self.is_playing = self.__is_playing()
 
     def __connect(self, client_id, client_secret, redirect_uri):
-        self.__spotipy = spotipy.Spotify(auth_manager=SpotifyOAuth(
-            client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, open_browser=False, scope="user-modify-playback-state,user-read-playback-state"))
+        auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
+        print(auth.get_authorize_url())
 
-        #auth = SpotifyOAuth(client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri, scope="user-modify-playback-state,user-read-playback-state")
-        #print(auth.get_authorize_url())
-
-        #self.__spotipy = spotipy.Spotify(auth_manager=auth)
+        self.__spotipy = spotipy.Spotify(auth_manager=auth)
 
     @property
     def volume(self):
