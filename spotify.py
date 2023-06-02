@@ -55,7 +55,7 @@ class Spotify(object):
         self.__log.add("volume set:  {}".format(value), "spotify")
         self.__spotipy.volume(value, device_id=self.__device_id)
         if "reset_volume" in self.__timers: self.__timers["reset_volume"].cancel()
-        self.__timers['reset_volume'] = Timer(10, reset_volume)
+        self.__timers['reset_volume'] = Timer(5, reset_volume)
         self.__timers['reset_volume'].start()
 
     @property
